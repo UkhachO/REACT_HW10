@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import styles from "./CatImage.module.css";
 
@@ -7,56 +7,43 @@ export default function CatImage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const isFirstLoad = useRef(true);
-  const isMounted = useRef(false);
+  useEffect(() => {
+    const controller = new AbortController();
 
-  const fetchCat = async () => {
-    if (!isMounted.current) return;
+    async function fetchCat() {
+      setLoading(true);
+      setError("");
+      try {
+        const response = await axios.get(
+          "https://api.thecatapi.com/v1/images/search",
+          { signal: controller.signal }
+        );
 
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await axios.get(
-        "https://api.thecatapi.com/v1/images/search"
-      );
-
-      const data = response.data;
-      if (
-        Array.isArray(data) &&
-        data.length > 0 &&
-        typeof data[0].url === "string"
-      ) {
-        if (isMounted.current) {
+        const data = response.data;
+        if (Array.isArray(data) && data[0]?.url) {
           setImageUrl(data[0].url);
+        } else {
+          setError("Неверный формат ответа API");
         }
-      } else {
-        throw new Error("Неверный формат ответа API");
-      }
-    } catch (err) {
-      if (isMounted.current) {
-        setError("Ошибка при загрузке изображения");
-        console.error(err);
-      }
-    } finally {
-      if (isMounted.current) {
+      } catch (err) {
+        if (axios.isCancel(err)) {
+        } else {
+          setError("Ошибка при загрузке изображения");
+          console.error(err);
+        }
+      } finally {
         setLoading(false);
       }
     }
-  };
 
-  useEffect(() => {
-    isMounted.current = true;
+    fetchCat();
 
-    if (isFirstLoad.current) {
-      fetchCat();
-      isFirstLoad.current = false;
-    }
-
-    return () => {
-      isMounted.current = false;
-    };
+    return () => controller.abort();
   }, []);
+
+  const handleReload = () => {
+    window.location.reload();
+  };
 
   return (
     <div className={styles.container}>
@@ -70,7 +57,7 @@ export default function CatImage() {
       )}
 
       <button
-        onClick={fetchCat}
+        onClick={handleReload}
         className={styles.reloadButton}
         disabled={loading}
       >
